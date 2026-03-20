@@ -244,6 +244,24 @@
 </head>
 <body>
 
+<!-- API KEY MODAL -->
+<div id="apiModal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(10,10,15,.97);backdrop-filter:blur(16px);flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:440px;background:#16161f;border:1px solid #2a2a3a;border-radius:16px;padding:28px;">
+    <div style="font-family:'Anton',sans-serif;font-size:28px;letter-spacing:2px;margin-bottom:6px;">🔑 CONFIGURAR API</div>
+    <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:#6b6b8a;margin-bottom:20px;">PRIMEIRA VEZ — APENAS UMA VEZ</div>
+    <p style="font-size:13px;color:#6b6b8a;line-height:1.7;margin-bottom:20px;">Para o bot funcionar, você precisa de uma chave da API Anthropic. É gratuito começar:<br><br>
+      <span style="color:#00ff88;">1.</span> Acesse <strong style="color:#f0f0f8;">console.anthropic.com</strong><br>
+      <span style="color:#00ff88;">2.</span> Crie uma conta gratuita<br>
+      <span style="color:#00ff88;">3.</span> Vá em <strong style="color:#f0f0f8;">API Keys → Create Key</strong><br>
+      <span style="color:#00ff88;">4.</span> Cole a chave abaixo (começa com <code style="color:#0066ff;">sk-ant-</code>)
+    </p>
+    <input id="apiKeyInput" type="password" placeholder="sk-ant-api03-..." style="width:100%;background:#0a0a0f;border:1px solid #2a2a3a;border-radius:8px;color:#f0f0f8;font-family:'Space Mono',monospace;font-size:12px;padding:13px 14px;outline:none;margin-bottom:8px;">
+    <div id="apiKeyError" style="display:none;color:#ff2244;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;margin-bottom:10px;">⚠ CHAVE INVÁLIDA — deve começar com sk-ant-</div>
+    <button onclick="confirmApiKey()" style="width:100%;background:#0066ff;color:white;border:none;border-radius:8px;padding:14px;font-family:'Anton',sans-serif;font-size:16px;letter-spacing:1px;cursor:pointer;margin-bottom:10px;">✓ SALVAR E USAR</button>
+    <p style="font-size:11px;color:#6b6b8a;text-align:center;line-height:1.6;">🔒 A chave fica salva <strong>só no seu celular</strong> (localStorage).<br>Ninguém mais tem acesso.</p>
+  </div>
+</div>
+
 <!-- INSTALL BANNER -->
 <div id="installBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:#111118;border-top:1px solid #2a2a3a;padding:14px 20px calc(14px + env(safe-area-inset-bottom));align-items:center;gap:14px;box-shadow:0 -8px 32px rgba(0,0,0,.6);">
   <div style="flex:1;">
@@ -274,6 +292,7 @@
         <div class="stat-item">META DIÁRIA <strong id="headerTotal">0/21</strong></div>
         <div class="stat-item">IDEIAS <strong id="headerIdeas">0</strong></div>
         <div class="stat-item">MISSÕES <strong id="headerMissions">0/0</strong></div>
+        <button onclick="resetApiKey()" style="background:transparent;border:1px solid #2a2a3a;border-radius:6px;color:#6b6b8a;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1px;padding:5px 10px;cursor:pointer;">🔑 API</button>
       </div>
     </div>
   </div>
@@ -505,6 +524,14 @@
 </div><!-- /container -->
 
 <script>
+/* ── API KEY ── */
+function getApiKey(){ return localStorage.getItem('gcb_apikey')||''; }
+function saveApiKey(k){ localStorage.setItem('gcb_apikey',k.trim()); }
+function checkApiKey(){ if(!getApiKey()){ document.getElementById('apiModal').style.display='flex'; return false; } return true; }
+function confirmApiKey(){ const v=document.getElementById('apiKeyInput').value.trim(); if(!v.startsWith('sk-ant-')){ document.getElementById('apiKeyError').style.display='block'; return; } saveApiKey(v); document.getElementById('apiModal').style.display='none'; document.getElementById('apiKeyError').style.display='none'; showToast('✓ CHAVE SALVA! PODE GERAR AGORA.'); }
+function resetApiKey(){ if(confirm('Remover chave da API?')){ localStorage.removeItem('gcb_apikey'); document.getElementById('apiModal').style.display='flex'; } }
+async function callClaude(prompt){ const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":getApiKey(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:8000,messages:[{role:"user",content:prompt}]})}); return await res.json(); }
+
 /* ── STATE ── */
 let allIdeas     = [];
 let allMissions  = [];
@@ -516,6 +543,8 @@ let missionFilter= 'all';
 let loadingTimer = null;
 
 updateQuota(); updateDayTracker(); updateMissionProgress(); updateHeaderTotal();
+// Mostra modal se não tiver chave
+if(!getApiKey()) document.getElementById('apiModal').style.display='flex';
 
 /* ── TABS ── */
 function switchTab(name, btn) {
@@ -543,6 +572,7 @@ function hideLoading(){ clearInterval(loadingTimer); document.getElementById('lo
    GENERATE IDEAS
 ══════════════════════════ */
 async function generateIdeas(){
+  if(!checkApiKey()) return;
   const btn=document.getElementById('generateBtn'); btn.disabled=true;
   showLoading(["Analisando tendências do TikTok e Reels...","Criando headlines com alto impacto...","Gerando letterings e inserts criativos...","Adaptando para formatos de bastidores...","Montando banco de ideias..."],'lf-blue','GERANDO IDEIAS...');
 
@@ -563,14 +593,13 @@ Gere exatamente ${count} ideias. Retorne APENAS array JSON válido, sem texto/ma
 Use gírias brasileiras, referências virais, varie MUITO os tipos, headlines que param o scroll.`;
 
   try{
-    const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:8000,messages:[{role:"user",content:prompt}]})});
-    const data=await res.json(); hideLoading(); btn.disabled=false;
+    const data=await callClaude(prompt); hideLoading(); btn.disabled=false;
     if(data.content?.[0]){
       let raw=data.content[0].text.trim().replace(/```json|```/g,'').trim();
       try{ allIdeas=JSON.parse(raw); renderIdeas(allIdeas); updateQuota(); document.getElementById('results-section').style.display='block'; document.getElementById('headerIdeas').textContent=allIdeas.length; showToast(`✓ ${allIdeas.length} IDEIAS GERADAS!`); }
       catch(e){ showToast('Erro ao processar. Tente novamente.'); console.error(e,raw); }
     }
-  }catch(e){ hideLoading(); btn.disabled=false; showToast('Erro de conexão.'); console.error(e); }
+  }catch(e){ hideLoading(); btn.disabled=false; showToast('Erro de conexão. Verifique sua chave de API.'); console.error(e); }
 }
 
 function renderIdeas(ideas){
@@ -618,6 +647,7 @@ function exportIdeas(){
    GENERATE MISSIONS
 ══════════════════════════ */
 async function generateMissions(){
+  if(!checkApiKey()) return;
   const btn=document.getElementById('missionBtn'); btn.disabled=true;
   showLoading(["Mapeando oportunidades no set...","Identificando momentos de alto viral...","Criando briefing de captação...","Definindo prioridades do dia...","Montando suas missões..."],'lf-orange','GERANDO MISSÕES...');
 
@@ -640,14 +670,13 @@ Gere exatamente ${count} missões. Retorne APENAS array JSON válido, sem texto/
 Seja MUITO específico e prático. Missões acionáveis — o videomaker lê e já sabe exatamente o que fazer. Varie momentos do dia, locais e tipos. Inclua missões ouro (raras e exclusivas) e missões cotidianas com ângulo criativo.`;
 
   try{
-    const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:8000,messages:[{role:"user",content:prompt}]})});
-    const data=await res.json(); hideLoading(); btn.disabled=false;
+    const data=await callClaude(prompt); hideLoading(); btn.disabled=false;
     if(data.content?.[0]){
       let raw=data.content[0].text.trim().replace(/```json|```/g,'').trim();
       try{ allMissions=JSON.parse(raw); renderMissions(allMissions); updateMissionProgress(); updateHeaderTotal(); showToast(`✓ ${allMissions.length} MISSÕES GERADAS!`); }
       catch(e){ showToast('Erro ao processar. Tente novamente.'); console.error(e,raw); }
     }
-  }catch(e){ hideLoading(); btn.disabled=false; showToast('Erro de conexão.'); console.error(e); }
+  }catch(e){ hideLoading(); btn.disabled=false; showToast('Erro de conexão. Verifique sua chave de API.'); console.error(e); }
 }
 
 function renderMissions(missions){
