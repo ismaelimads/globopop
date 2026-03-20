@@ -248,17 +248,17 @@
 <div id="apiModal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(10,10,15,.97);backdrop-filter:blur(16px);flex-direction:column;align-items:center;justify-content:center;padding:24px;">
   <div style="width:100%;max-width:440px;background:#16161f;border:1px solid #2a2a3a;border-radius:16px;padding:28px;">
     <div style="font-family:'Anton',sans-serif;font-size:28px;letter-spacing:2px;margin-bottom:6px;">🔑 CONFIGURAR API</div>
-    <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:#6b6b8a;margin-bottom:20px;">PRIMEIRA VEZ — APENAS UMA VEZ</div>
-    <p style="font-size:13px;color:#6b6b8a;line-height:1.7;margin-bottom:20px;">Para o bot funcionar, você precisa de uma chave da API Anthropic. É gratuito começar:<br><br>
-      <span style="color:#00ff88;">1.</span> Acesse <strong style="color:#f0f0f8;">console.anthropic.com</strong><br>
-      <span style="color:#00ff88;">2.</span> Crie uma conta gratuita<br>
-      <span style="color:#00ff88;">3.</span> Vá em <strong style="color:#f0f0f8;">API Keys → Create Key</strong><br>
-      <span style="color:#00ff88;">4.</span> Cole a chave abaixo (começa com <code style="color:#0066ff;">sk-ant-</code>)
+    <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:#00ff88;margin-bottom:20px;">100% GRATUITO — GOOGLE GEMINI</div>
+    <p style="font-size:13px;color:#6b6b8a;line-height:1.7;margin-bottom:20px;">Pegue sua chave gratuita em 2 minutos:<br><br>
+      <span style="color:#00ff88;">1.</span> Acesse <strong style="color:#f0f0f8;">aistudio.google.com</strong><br>
+      <span style="color:#00ff88;">2.</span> Faça login com sua conta Google<br>
+      <span style="color:#00ff88;">3.</span> Clique em <strong style="color:#f0f0f8;">"Get API Key" → "Create API Key"</strong><br>
+      <span style="color:#00ff88;">4.</span> Copie a chave e cole abaixo
     </p>
-    <input id="apiKeyInput" type="password" placeholder="sk-ant-api03-..." style="width:100%;background:#0a0a0f;border:1px solid #2a2a3a;border-radius:8px;color:#f0f0f8;font-family:'Space Mono',monospace;font-size:12px;padding:13px 14px;outline:none;margin-bottom:8px;">
-    <div id="apiKeyError" style="display:none;color:#ff2244;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;margin-bottom:10px;">⚠ CHAVE INVÁLIDA — deve começar com sk-ant-</div>
+    <input id="apiKeyInput" type="password" placeholder="AIza..." style="width:100%;background:#0a0a0f;border:1px solid #2a2a3a;border-radius:8px;color:#f0f0f8;font-family:'Space Mono',monospace;font-size:12px;padding:13px 14px;outline:none;margin-bottom:8px;">
+    <div id="apiKeyError" style="display:none;color:#ff2244;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;margin-bottom:10px;">⚠ CHAVE INVÁLIDA — verifique e tente novamente</div>
     <button onclick="confirmApiKey()" style="width:100%;background:#0066ff;color:white;border:none;border-radius:8px;padding:14px;font-family:'Anton',sans-serif;font-size:16px;letter-spacing:1px;cursor:pointer;margin-bottom:10px;">✓ SALVAR E USAR</button>
-    <p style="font-size:11px;color:#6b6b8a;text-align:center;line-height:1.6;">🔒 A chave fica salva <strong>só no seu celular</strong> (localStorage).<br>Ninguém mais tem acesso.</p>
+    <p style="font-size:11px;color:#6b6b8a;text-align:center;line-height:1.6;">🔒 A chave fica salva <strong>só no seu celular</strong>.<br>Ninguém mais tem acesso. Uso 100% gratuito.</p>
   </div>
 </div>
 
@@ -528,9 +528,25 @@
 function getApiKey(){ return localStorage.getItem('gcb_apikey')||''; }
 function saveApiKey(k){ localStorage.setItem('gcb_apikey',k.trim()); }
 function checkApiKey(){ if(!getApiKey()){ document.getElementById('apiModal').style.display='flex'; return false; } return true; }
-function confirmApiKey(){ const v=document.getElementById('apiKeyInput').value.trim(); if(!v.startsWith('sk-ant-')){ document.getElementById('apiKeyError').style.display='block'; return; } saveApiKey(v); document.getElementById('apiModal').style.display='none'; document.getElementById('apiKeyError').style.display='none'; showToast('✓ CHAVE SALVA! PODE GERAR AGORA.'); }
+function confirmApiKey(){ const v=document.getElementById('apiKeyInput').value.trim(); if(v.length < 20){ document.getElementById('apiKeyError').style.display='block'; return; } saveApiKey(v); document.getElementById('apiModal').style.display='none'; document.getElementById('apiKeyError').style.display='none'; showToast('✓ CHAVE SALVA! PODE GERAR AGORA.'); }
 function resetApiKey(){ if(confirm('Remover chave da API?')){ localStorage.removeItem('gcb_apikey'); document.getElementById('apiModal').style.display='flex'; } }
-async function callClaude(prompt){ const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":getApiKey(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:8000,messages:[{role:"user",content:prompt}]})}); return await res.json(); }
+
+async function callClaude(prompt){
+  const key = getApiKey();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 8000, temperature: 0.9 }
+    })
+  });
+  const data = await res.json();
+  // Normalize response to match expected format
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return { content: [{ text }] };
+}
 
 /* ── STATE ── */
 let allIdeas     = [];
